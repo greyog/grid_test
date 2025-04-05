@@ -20,6 +20,11 @@
             <artifactId>guava</artifactId>
             <version>33.4.6-jre</version>
         </dependency>
+        <dependency>
+            <groupId>org.jfree</groupId>
+            <artifactId>jfreechart</artifactId>
+            <version>1.5.5</version>
+        </dependency>
     </dependencies>
 
 </project>

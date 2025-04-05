@@ -10,10 +10,11 @@ import java.util.Comparator;
 public class Main {
 
     private static final int SCALE = 6;
+    private static final int QTY_SCALE = 5;
 
     public static void main(String[] args) {
         var fee = BigDecimal.valueOf(0.001);
-        var qty = BigDecimal.valueOf(0.00304);
+        var defQty = BigDecimal.valueOf(0.00304).setScale(QTY_SCALE, RoundingMode.CEILING);
         var h = BigDecimal.valueOf(5);
         var defPrice = BigDecimal.valueOf(1800);
         var defBaseBalance = BigDecimal.valueOf(0.065).setScale(SCALE, RoundingMode.HALF_UP);
@@ -23,9 +24,11 @@ public class Main {
         var tradeCount = 1000;
         var results = new ArrayList<TradeResult>();
         for (int j = 0; j < epochCount; j++) {
+//            System.out.println("\"--------------------------------------------\" = " + "--------------------------------------------");
             var price = defPrice;
             var baseBalance = defBaseBalance;
             var quoteBalance = defQuoteBalance;
+            var qty = defQty;
             var sellCount = 0;
             var buyCount = 0;
             for (int i = 0; i < tradeCount; i++) {
@@ -33,11 +36,15 @@ public class Main {
                 price = switch (side) {
                     case BUY -> {
                         buyCount++;
-                        yield price.add(h);
+                        BigDecimal nextPrice = price.subtract(h);
+                        qty = BigDecimal.ONE.add(fee).multiply(defQty).setScale(QTY_SCALE, RoundingMode.CEILING);
+                        yield nextPrice;
                     }
                     case SELL -> {
                         sellCount++;
-                        yield price.subtract(h);
+                        BigDecimal nextPrice = price.add(h);
+                        qty = defQty;
+                        yield nextPrice;
                     }
                 };
                 if (price.compareTo(BigDecimal.ZERO) <= 0) {
@@ -151,6 +158,7 @@ public class Main {
             result = trade(Side.SELL, baseBalance, quoteBalance, halfBase, price, fee);
 //            result = new BaseQuoteBalances(rebalanceState.baseBalance, halfQuote);
         }
+//        System.out.println("side =" + side + ", qty = " + qty + ", result = " + result);
         return result;
     }
 }

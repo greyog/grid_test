@@ -6,6 +6,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.IntStream;
 
 public class Main {
 
@@ -14,45 +17,49 @@ public class Main {
 
     public static void main(String[] args) {
         var fee = BigDecimal.valueOf(0.001);
-        var defQty = BigDecimal.valueOf(0.00304).setScale(QTY_SCALE, RoundingMode.CEILING);
-        var h = BigDecimal.valueOf(5);
+        var defQty = BigDecimal.valueOf(0.00278).setScale(QTY_SCALE, RoundingMode.CEILING);
+        var h = BigDecimal.valueOf(10);
         var defPrice = BigDecimal.valueOf(1800);
-        var defBaseBalance = BigDecimal.valueOf(0.065).setScale(SCALE, RoundingMode.HALF_UP);
-        var defQuoteBalance = BigDecimal.valueOf(117).setScale(SCALE, RoundingMode.HALF_UP);
+        var defBaseBalance = BigDecimal.valueOf(1).setScale(SCALE, RoundingMode.HALF_UP);
+        var defQuoteBalance = BigDecimal.valueOf(1800).setScale(SCALE, RoundingMode.HALF_UP);
         printStats("Initial", defPrice, defBaseBalance, defQuoteBalance);
-        var epochCount = 1000;
-        var tradeCount = 1000;
-        var results = new ArrayList<TradeResult>();
-        for (int j = 0; j < epochCount; j++) {
+        var epochCount = 2000;
+        var tradeCount = 2000;
+        var results = new ConcurrentLinkedDeque<TradeResult>();
+        var start = System.currentTimeMillis();
+        IntStream.range(0, epochCount)
+                .parallel()
+                .forEach(value -> {
 //            System.out.println("\"--------------------------------------------\" = " + "--------------------------------------------");
-            var price = defPrice;
-            var baseBalance = defBaseBalance;
-            var quoteBalance = defQuoteBalance;
-            var qty = defQty;
-            var sellCount = 0;
-            var buyCount = 0;
-            for (int i = 0; i < tradeCount; i++) {
-                var side = Math.random() >= 0.5 ? Side.BUY : Side.SELL;
-                price = switch (side) {
-                    case BUY -> {
-                        buyCount++;
-                        BigDecimal nextPrice = price.subtract(h);
-                        qty = BigDecimal.ONE.add(fee).multiply(defQty).setScale(QTY_SCALE, RoundingMode.CEILING);
-                        yield nextPrice;
-                    }
-                    case SELL -> {
-                        sellCount++;
-                        BigDecimal nextPrice = price.add(h);
-                        qty = defQty;
-                        yield nextPrice;
-                    }
-                };
-                if (price.compareTo(BigDecimal.ZERO) <= 0) {
-                    continue;
-                }
-                var nextState = trade(side, baseBalance, quoteBalance, qty, price, fee);
-                baseBalance = nextState.baseBalance;
-                quoteBalance = nextState.quoteBalance;
+                    var price = defPrice;
+                    var baseBalance = defBaseBalance;
+                    var quoteBalance = defQuoteBalance;
+                    var qty = defQty;
+                    var sellCount = 0;
+                    var buyCount = 0;
+                    var side = Side.BUY;
+                    for (int i = 0; i < tradeCount; i++) {
+                        side = ThreadLocalRandom.current().nextDouble() >= 0.5 ? Side.BUY : Side.SELL;
+                        price = switch (side) {
+                            case BUY -> {
+                                buyCount++;
+                                BigDecimal nextPrice = price.subtract(h);
+                                qty = BigDecimal.ONE.add(fee).multiply(defQty).setScale(QTY_SCALE, RoundingMode.CEILING);
+                                yield nextPrice;
+                            }
+                            case SELL -> {
+                                sellCount++;
+                                BigDecimal nextPrice = price.add(h);
+                                qty = defQty;
+                                yield nextPrice;
+                            }
+                        };
+                        if (price.compareTo(BigDecimal.ZERO) <= 0) {
+                            continue;
+                        }
+                        var nextState = trade(side, baseBalance, quoteBalance, qty, price, fee);
+                        baseBalance = nextState.baseBalance;
+                        quoteBalance = nextState.quoteBalance;
 //                if (baseBalance.compareTo(BigDecimal.ZERO) <= 0) {
 //                    System.out.println("Zero baseBalance");
 //                    printStats(buyCount, sellCount, price, baseBalance, quoteBalance);
@@ -62,9 +69,11 @@ public class Main {
 //                    printStats(buyCount, sellCount, price, baseBalance, quoteBalance);
 //                    return;
 //                }
-                results.add(new TradeResult(price, baseBalance, quoteBalance));
-            }
-        }
+                    }
+                    results.add(new TradeResult(price, baseBalance, quoteBalance));
+                });
+        System.out.println("time = " + (System.currentTimeMillis() - start) / 1000.0);
+        System.out.println("results.size() = " + results.size());
 //        results.stream()
 //                .max(Comparator.comparing(TradeResult::baseBalance))
 //                .ifPresent(tradeResult -> printStats("Best baseBalance", tradeResult.lastPrice, tradeResult.baseBalance, tradeResult.quoteBalance));
